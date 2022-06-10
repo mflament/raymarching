@@ -1,0 +1,51 @@
+{
+  "name": "ray-marching",
+  "version": "0.1.0",
+  "description": "webgl 2 ray marching",
+  "browser": "dist/index.js",
+  "scripts": {
+    "build": "npm run clean & npm run rollup & npm run dist",
+    "rollup": "rollup -c ./rollup.config.js",
+    "dist": "copy-and-watch assets/* dist/.",
+    "tsdserver": "tsdserver -l tcp://localhost:8090",
+    "tsc_watch": "tsc --watch",
+    "clean": "rimraf dist"
+  },
+  "files": [
+    "dist/**/*"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/mflament/ray-marching.git"
+  },
+  "publishConfig": {
+    "registry": "http://localhost:4873"
+  },
+  "author": "Yah",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mflament/ray-marching/issues"
+  },
+  "homepage": "https://github.com/mflament/ray-marching",
+  "type": "module",
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^17.1.0",
+    "@rollup/plugin-eslint": "^8.0.1",
+    "@rollup/plugin-node-resolve": "^13.2.1",
+    "@typescript-eslint/eslint-plugin": "^5.5.0",
+    "@typescript-eslint/parser": "^5.5.0",
+    "copy-and-watch": "^0.1.6",
+    "eslint": "^7.26.0",
+    "rimraff": "^0.0.1-security",
+    "rollup": "^2.60.1",
+    "rollup-plugin-external-globals": "^0.6.1",
+    "rollup-plugin-typescript2": "^0.31.1",
+    "tsdserver": "^3.0.6",
+    "tslib": "^2.3.1",
+    "typescript": "^4.6.4"
+  },
+  "dependencies": {
+    "gl-matrix": "^3.4.3",
+    "webgl-support" : "^0.0.2"
+  }
+}
