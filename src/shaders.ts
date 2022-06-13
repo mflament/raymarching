@@ -35,6 +35,7 @@ const RAY_MARCHER_FS = `
         int numShapes;
         mat4 matrixWorld;
         mat4 projectionMatrixInverse;
+        vec3 ambient;
         vec3 light;
         int positionLight;
     };
@@ -186,12 +187,10 @@ const RAY_MARCHER_FS = `
 
     float calculateShadow(Ray ray, float dstToShadePoint) {
         float rayDst = 0.;
-        int marchSteps = 0;
         float shadowIntensity = .2;
         float brightness = 1.;
 
         while (rayDst < dstToShadePoint) {
-            marchSteps ++;
             vec4 sceneInfo = createSceneInfo(ray.origin);
             float dst = sceneInfo.w;
 
@@ -211,9 +210,7 @@ const RAY_MARCHER_FS = `
     void main() {
         Ray ray = createCameraRay(uv);
         float rayDst = 0.;
-        int marchSteps = 0;
         while (rayDst < maxDst) {
-            marchSteps++;
             vec4 sceneInfo = createSceneInfo(ray.origin);
             float dst = sceneInfo.w;
 
@@ -224,8 +221,6 @@ const RAY_MARCHER_FS = `
                 float lighting = clamp(dot(normal, lightDir), 0., 1.);
                 vec3 col = sceneInfo.xyz;
 
-                color = vec4(col * lighting, 1.);
-                /*
                 // Shadow
                 vec3 offsetPos = pointOnSurface + normal * shadowBias;
                 vec3 dirToLight = positionLight != 0 ? normalize(light - offsetPos) : -light;
@@ -233,11 +228,10 @@ const RAY_MARCHER_FS = `
                 ray.origin = offsetPos;
                 ray.direction = dirToLight;
 
-                float dstToLight = positionLight != 0 ? distance(offsetPos, light) : maxDst;
+                float dstToLight = positionLight != 0 ? min(maxDst, distance(offsetPos, light)) : maxDst;
                 float shadow = calculateShadow(ray, dstToLight);
 
-                color = vec4(col * lighting * shadow, 1.);
-                */
+                color = vec4(col * lighting * shadow + ambient, 1.);
 
                 return;
             }

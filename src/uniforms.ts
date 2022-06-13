@@ -4,6 +4,7 @@
  *  int numShapes;          1 * 4 + (3 * 4 align)
  *  mat4 matrixWorld;       4 * 4 * 4
  *  mat4 projectionMatrixInverse;   4 * 4 * 4
+ *  vec3 ambient;           4 * 4
  *  vec3 light;             3 * 4
  *  int positionLight;      1 * 4
  * };
@@ -14,6 +15,7 @@ import {PerspectiveCamera} from "./PerspectiveCamera";
 import {DirectionalLight, PointLight} from "./Light";
 
 const MATRIX4_BYTES = 4 * 4 * 4;
+const VEC4_BYTES = 4 * 4;
 const VEC3_BYTES = 3 * 4;
 const INT32_BYTES = 4;
 
@@ -24,7 +26,8 @@ export class Uniforms {
     static readonly NUM_SHAPES_OFFSET = Uniforms.SHAPES_OFFSET + Shape.BYTES * Uniforms.MAX_SHAPES;
     static readonly MATRIX_WORLD_OFFSET = Uniforms.NUM_SHAPES_OFFSET + 4 * INT32_BYTES;
     static readonly MATRIX_PROJECTION_OFFSET = Uniforms.MATRIX_WORLD_OFFSET + MATRIX4_BYTES;
-    static readonly LIGHT_OFFSET = Uniforms.MATRIX_PROJECTION_OFFSET + MATRIX4_BYTES;
+    static readonly AMBIENT_OFFSET = Uniforms.MATRIX_PROJECTION_OFFSET + MATRIX4_BYTES;
+    static readonly LIGHT_OFFSET = Uniforms.AMBIENT_OFFSET + VEC4_BYTES;
     static readonly POSITION_LIGHT_OFFSET = Uniforms.LIGHT_OFFSET + VEC3_BYTES;
 
     static readonly BYTES = Uniforms.POSITION_LIGHT_OFFSET + INT32_BYTES;
@@ -34,7 +37,7 @@ export class Uniforms {
     private readonly buffer: Uint8Array = new Uint8Array(Uniforms.BYTES);
     private readonly dataView: DataView = new DataView(this.buffer.buffer);
     private readonly glBuffer: WebGLBuffer;
-    private readonly dirtyRange = [0, 0];
+    private readonly dirtyRange = [-1, -1];
 
     constructor(readonly gl: WebGL2RenderingContext, readonly blockBinding = 0) {
         const glBuffer = gl.createBuffer();
@@ -67,6 +70,10 @@ export class Uniforms {
         this.updateDirtyRange(Uniforms.MATRIX_WORLD_OFFSET, 2 * MATRIX4_BYTES);
     }
 
+    setAmbient(color: vec3): void {
+        this.setVector3(Uniforms.AMBIENT_OFFSET, color);
+    }
+
     setLight(light: DirectionalLight | PointLight): void {
         if (light.type === 'directional') {
             this.setVector3(Uniforms.LIGHT_OFFSET, light.direction);
@@ -84,7 +91,7 @@ export class Uniforms {
             gl.bindBuffer(gl.UNIFORM_BUFFER, glBuffer);
             gl.bufferSubData(gl.UNIFORM_BUFFER, this.dirtyRange[0], buffer, this.dirtyRange[0], this.dirtyRange[1] - this.dirtyRange[0]);
             gl.bindBuffer(gl.UNIFORM_BUFFER, null);
-            this.dirtyRange[0] = this.dirtyRange[1] = 0;
+            this.dirtyRange[0] = this.dirtyRange[1] = -1;
             return true;
         }
         return false;
@@ -110,8 +117,10 @@ export class Uniforms {
     }
 
     private updateDirtyRange(offset: number, bytes: number): void {
-        this.dirtyRange[0] = Math.min(offset, this.dirtyRange[0]);
-        this.dirtyRange[1] = Math.max(offset + bytes, this.dirtyRange[1]);
+        if (this.dirtyRange[0] < 0) this.dirtyRange[0] = offset;
+        else this.dirtyRange[0] = Math.min(offset, this.dirtyRange[0]);
+        if (this.dirtyRange[1] < 0) this.dirtyRange[1] = offset + bytes;
+        else this.dirtyRange[1] = Math.max(offset + bytes, this.dirtyRange[1]);
     }
 
 }

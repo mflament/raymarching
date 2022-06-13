@@ -3,10 +3,11 @@ import {Uniforms} from "./uniforms";
 import {GLContext, QuadRenderer, RunningState} from "webgl-support";
 import {PerspectiveCamera} from "./PerspectiveCamera";
 import {DirectionalLight, PointLight} from "./Light";
-import {vec3} from "gl-matrix";
+import {quat, vec3} from "gl-matrix";
 import {Shape, ShapeType} from "./shape";
+import {OrbitControls} from "./orbitControls";
 
-const pointLight = true;
+const pointLight = false;
 
 /**
  * https://github.com/SebLague/Ray-Marching/
@@ -19,16 +20,20 @@ function start() {
 
     const camera = new PerspectiveCamera({
         position: [0, 0, 5],
-        target: [0,0,0],
+        target: [0, 0, 0],
         aspect: canvas.width / canvas.height
     });
 
     const uniforms = new Uniforms(context.gl);
+
+    const amb =  .08;
+    uniforms.setAmbient([amb, amb, amb]);
+
     let light: DirectionalLight | PointLight;
     if (pointLight) {
         light = {type: 'point', position: vec3.set(vec3.create(), 5, 5, 5)}
     } else {
-        const direction = vec3.set(vec3.create(), 1, 0, 0);
+        const direction = vec3.set(vec3.create(), -0.5, -0.5, -0.5);
         vec3.normalize(direction, direction);
         light = {type: 'directional', direction: direction};
     }
@@ -44,21 +49,38 @@ function start() {
         color: [0, 1, 0],
         shapeType: ShapeType.Sphere,
     }));
-    // uniforms.addShape(new Shape({color: [1,0,0], size: [1,1,1], position: [1, 0, 1], shapeType: ShapeType.Cube}));
+    uniforms.addShape(new Shape({
+        position: [2, 2, 1],
+        size: [1, 1, 1],
+        color: [1, 0, 0],
+        shapeType: ShapeType.Cube,
+    }));
     // uniforms.addShape(new Shape({color: [0,0,1], size: [1,1,1], position: [0, 1, 1], shapeType: ShapeType.Sphere}));
 
     const quadRenderer = new QuadRenderer(context, program);
+    new OrbitControls(camera, canvas);
+
+    const ligthTransform = quat.create();
     context.renderer = {
         program: program,
         render(rs: RunningState) {
+            if (camera.update()) uniforms.setCamera(camera);
+            const angle = rs.dt * 0.1 * Math.PI;
+            if (light.type === 'directional') {
+                quat.rotateY(ligthTransform, quat.identity(ligthTransform), angle);
+                vec3.transformQuat(light.direction, light.direction, ligthTransform);
+                uniforms.setLight(light);
+            } else {
+                vec3.rotateY(light.position, light.position, [0,light.position[1], 0], angle);
+                uniforms.setLight(light);
+            }
             if (uniforms.updateGlBuffer()) {
                 quadRenderer.render(rs);
             }
         },
         resized: (width, height) => {
             camera.aspect = width / height;
-            camera.updateProjectionMatrix();
-            uniforms.setCamera(camera);
+            camera.touchProjection();
         }
     };
     context.running = true;
