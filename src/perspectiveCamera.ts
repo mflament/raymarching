@@ -17,9 +17,6 @@ export class PerspectiveCamera {
     private readonly _projectionMatrix = mat4.create();
     private readonly _invProjectionMatrix = mat4.create();
 
-    private _worldNeedUpdate = true;
-    private _projNeedUpdate = true;
-
     constructor(config?: Partial<PerspectiveCamera>) {
         if (config?.position) vec3.copy(this.position, config?.position);
         if (config?.target) vec3.copy(this.target, config?.target);
@@ -28,6 +25,8 @@ export class PerspectiveCamera {
         if (config?.fovx !== undefined) this.fovx = config.fovx;
         if (config?.near !== undefined) this.near = config.near;
         if (config?.far !== undefined) this.far = config.far;
+        this.updateProjectionMatrix();
+        this.updateWorldMatrix();
     }
 
     get worldMatrix(): mat4 {
@@ -46,36 +45,12 @@ export class PerspectiveCamera {
         return this._invProjectionMatrix;
     }
 
-    touchWorld(): void {
-        this._worldNeedUpdate = true;
-    }
-
-    touchProjection(): void {
-        this._projNeedUpdate = true;
-    }
-
-    update(): boolean {
-        let res = false;
-        if (this._worldNeedUpdate) {
-            this.updateWorldMatrix();
-            this._worldNeedUpdate = false;
-            res = true;
-        }
-        if (this._projNeedUpdate)
-        {
-            this.updateProjectionMatrix();
-            this._projNeedUpdate = false;
-            res = true;
-        }
-        return res;
-    }
-
-    private updateWorldMatrix(): void {
+    updateWorldMatrix(): void {
         mat4.lookAt(this._worldMatrix, this.position, this.target, this.up);
         mat4.invert(this._invWorldMatrix, this._worldMatrix);
     }
 
-    private updateProjectionMatrix(): void {
+    updateProjectionMatrix(): void {
         const fovy = this.fovx / this.aspect;
         mat4.perspective(this._projectionMatrix, fovy, this.aspect, this.near, this.far);
         mat4.invert(this._invProjectionMatrix, this._projectionMatrix);
