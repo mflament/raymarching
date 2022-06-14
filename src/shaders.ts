@@ -81,6 +81,7 @@ const RAY_MARCHER_FS = `
         vec3 o = abs(eye - centre) - size;
         float ud = length(max(o, 0.));
         float n = max(max(min(o.x, 0.), min(o.y, 0.)), min(o.z, 0.));
+                
         return ud + n;
     }
 

@@ -1,6 +1,5 @@
 import {PerspectiveCamera} from "./perspectiveCamera";
 import {vec2, vec3} from "gl-matrix";
-import "./myVec3";
 import MyMath from "./myMath";
 
 export enum MouseButton {

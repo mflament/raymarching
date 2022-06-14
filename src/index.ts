@@ -4,7 +4,7 @@ import {GLContext, QuadRenderer, RunningState} from "webgl-support";
 import {PerspectiveCamera} from "./PerspectiveCamera";
 import {DirectionalLight, PointLight} from "./Light";
 import {quat, vec3} from "gl-matrix";
-import {Shape, ShapeType} from "./shape";
+import {Operation, Shape, ShapeType} from "./shape";
 import {OrbitControls} from "./orbitControls";
 
 const pointLight = false;
@@ -45,15 +45,18 @@ function start() {
 
     uniforms.addShape(new Shape({
         position: [0, 0, 0],
-        size: [1, 1, 1],
+        size: [Math.sqrt(2), Math.sqrt(2), Math.sqrt(2)],
         color: [0, 1, 0],
         shapeType: ShapeType.Sphere,
+        numChildren: 1
     }));
     uniforms.addShape(new Shape({
-        position: [2, 2, 1],
+        position: [0, 0, 0],
         size: [1, 1, 1],
         color: [1, 0, 0],
         shapeType: ShapeType.Cube,
+        operation: Operation.Cut,
+        blendStrength: .5
     }));
     // uniforms.addShape(new Shape({color: [0,0,1], size: [1,1,1], position: [0, 1, 1], shapeType: ShapeType.Sphere}));
 
