@@ -51,17 +51,24 @@ function start() {
     }));
 
     uniforms.addShape(new Shape({
-        position: [0, 0, -1.5],
+        position: [.5, 0, -1.5],
         size: [1, 1, 1],
         color: [1, 0, 0],
         shapeType: ShapeType.Cube,
     }));
 
     uniforms.addShape(new Shape({
-        position: [0, 0, -3.5],
+        position: [-.5, 0, -3],
         size: [1, 1, 1],
         color: [0, 0, 1],
         shapeType: ShapeType.Cube,
+    }));
+
+    uniforms.addShape(new Shape({
+        position: [-1, 0, -1.5],
+        size: [.5, 1, 1],
+        color: [1, 0, 1],
+        shapeType: ShapeType.Sphere,
     }));
 
     // uniforms.addShape(new Shape({color: [0,0,1], size: [1,1,1], position: [0, 1, 1], shapeType: ShapeType.Sphere}));
