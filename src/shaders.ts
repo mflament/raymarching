@@ -73,12 +73,16 @@ const RAY_MARCHER_FS = `
     }
 
     // Following distance functions from https://iquilezles.org/www/articles/distfunctions/distfunctions.htm
+    float dot2( in vec2 v ) { return dot(v,v); }
+    float dot2( in vec3 v ) { return dot(v,v); }
+    float ndot( in vec2 a, in vec2 b ) { return a.x*b.x - a.y*b.y; }
+
     float getSphereDistance(vec3 eye, vec3 centre, float radius) {
         return distance(eye, centre) - radius;
     }
 
     float getCubeDistance(vec3 eye, vec3 centre, vec3 size) {
-        vec3 o = abs(eye - centre) - size;
+        vec3 o = abs(eye - centre) - size * .5;
         float ud = length(max(o, 0.));
         float n = max(max(min(o.x, 0.), min(o.y, 0.)), min(o.z, 0.));
                 

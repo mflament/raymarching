@@ -1,10 +1,10 @@
 import {Shaders} from "./shaders";
 import {Uniforms} from "./uniforms";
-import {GLContext, QuadRenderer, RunningState} from "webgl-support";
+import {FPSOverlay, GLContext, QuadRenderer, RunningState} from "webgl-support";
 import {PerspectiveCamera} from "./PerspectiveCamera";
 import {DirectionalLight, PointLight} from "./Light";
 import {quat, vec3} from "gl-matrix";
-import {Operation, Shape, ShapeType} from "./shape";
+import {Shape, ShapeType} from "./shape";
 import {OrbitControls} from "./orbitControls";
 
 const pointLight = false;
@@ -13,10 +13,10 @@ const pointLight = false;
  * https://github.com/SebLague/Ray-Marching/
  */
 function start() {
-    const canvas = document.getElementById('glcanvas') as HTMLCanvasElement;
-    if (!canvas) throw new Error("Canvas not found");
-    const context = new GLContext(canvas);
+    const context = new GLContext();
     const gl = context.gl;
+    const canvas = context.canvas;
+    new FPSOverlay(context);
 
     const camera = new PerspectiveCamera({
         position: [0, 0, 5],
@@ -26,7 +26,7 @@ function start() {
 
     const uniforms = new Uniforms(context.gl);
 
-    const amb =  .08;
+    const amb = .08;
     uniforms.setAmbient([amb, amb, amb]);
 
     let light: DirectionalLight | PointLight;
@@ -45,36 +45,46 @@ function start() {
 
     uniforms.addShape(new Shape({
         position: [0, 0, 0],
-        size: [Math.sqrt(2), Math.sqrt(2), Math.sqrt(2)],
+        size: [1, 1, 1],
         color: [0, 1, 0],
-        shapeType: ShapeType.Sphere,
-        numChildren: 1
+        shapeType: ShapeType.Cube,
     }));
+
     uniforms.addShape(new Shape({
-        position: [0, 0, 0],
+        position: [0, 0, -1.5],
         size: [1, 1, 1],
         color: [1, 0, 0],
         shapeType: ShapeType.Cube,
-        operation: Operation.Cut,
-        blendStrength: .5
     }));
+
+    uniforms.addShape(new Shape({
+        position: [0, 0, -3.5],
+        size: [1, 1, 1],
+        color: [0, 0, 1],
+        shapeType: ShapeType.Cube,
+    }));
+
     // uniforms.addShape(new Shape({color: [0,0,1], size: [1,1,1], position: [0, 1, 1], shapeType: ShapeType.Sphere}));
 
     const quadRenderer = new QuadRenderer(context, program);
-    new OrbitControls(camera, canvas);
-
-    const ligthTransform = quat.create();
+    const controls = new OrbitControls(camera, canvas);
+    let updateCam = true;
+    controls.onChange = () => updateCam = true;
+    const lightTransform = quat.create();
     context.renderer = {
         program: program,
         render(rs: RunningState) {
-            if (camera.update()) uniforms.setCamera(camera);
+            if (updateCam) {
+                uniforms.setCamera(camera);
+                updateCam = false;
+            }
             const angle = rs.dt * 0.1 * Math.PI;
             if (light.type === 'directional') {
-                quat.rotateY(ligthTransform, quat.identity(ligthTransform), angle);
-                vec3.transformQuat(light.direction, light.direction, ligthTransform);
+                quat.rotateY(lightTransform, quat.identity(lightTransform), angle);
+                vec3.transformQuat(light.direction, light.direction, lightTransform);
                 uniforms.setLight(light);
             } else {
-                vec3.rotateY(light.position, light.position, [0,light.position[1], 0], angle);
+                vec3.rotateY(light.position, light.position, [0, light.position[1], 0], angle);
                 uniforms.setLight(light);
             }
             if (uniforms.updateGlBuffer()) {
@@ -83,7 +93,8 @@ function start() {
         },
         resized: (width, height) => {
             camera.aspect = width / height;
-            camera.touchProjection();
+            camera.updateProjectionMatrix();
+            updateCam = true;
         }
     };
     context.running = true;

@@ -18,9 +18,6 @@
     "type": "git",
     "url": "git+ssh://git@github.com/mflament/ray-marching.git"
   },
-  "publishConfig": {
-    "registry": "http://localhost:4873"
-  },
   "author": "Yah",
   "license": "ISC",
   "bugs": {
@@ -46,6 +43,6 @@
   },
   "dependencies": {
     "gl-matrix": "^3.4.3",
-    "webgl-support" : "^0.0.2"
+    "webgl-support": "^1.0.0"
   }
 }
