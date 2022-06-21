@@ -1,5 +1,6 @@
-import {mat4, vec3} from 'gl-matrix';
+import {mat4, ReadonlyVec2, vec3, vec4} from 'gl-matrix';
 import MyMath from "./myMath";
+import {Ray} from "./ray";
 
 export class PerspectiveCamera {
     readonly position = vec3.set(vec3.create(), 0, 0, 4);
@@ -56,4 +57,14 @@ export class PerspectiveCamera {
         mat4.invert(this._invProjectionMatrix, this._projectionMatrix);
     }
 
+    rayCaster(): (ray: Ray, uv: ReadonlyVec2) => Ray {
+        const v4 = vec4.create();
+        return (ray, uv) => {
+            vec3.copy(ray.origin, vec4.transformMat4(v4, vec4.set(v4, 0, 0, 0, 1), this._invWorldMatrix) as vec3);
+            vec3.copy(ray.dir, vec4.transformMat4(v4, vec4.set(v4, uv[0], uv[1], 0, 1), this._invProjectionMatrix) as vec3);
+            vec3.copy(ray.dir, vec4.transformMat4(v4, vec4.set(v4, ray.dir[0], ray.dir[1], ray.dir[2], 0), this._invWorldMatrix) as vec3);
+            vec3.normalize(ray.dir, ray.dir);
+            return ray;
+        };
+    }
 }

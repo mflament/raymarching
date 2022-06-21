@@ -17,110 +17,117 @@ import {DirectionalLight, PointLight} from "./Light";
 const MATRIX4_BYTES = 4 * 4 * 4;
 const VEC4_BYTES = 4 * 4;
 const VEC3_BYTES = 3 * 4;
-const INT32_BYTES = 4;
+const INT_BYTES = 4;
 
-export class Uniforms {
-    static readonly MAX_SHAPES = 10;
+export abstract class UniformBlock {
+    protected readonly dataView: DataView;
+    protected readonly glBuffer: WebGLBuffer;
 
-    static readonly SHAPES_OFFSET = 0;
-    static readonly NUM_SHAPES_OFFSET = Uniforms.SHAPES_OFFSET + Shape.BYTES * Uniforms.MAX_SHAPES;
-    static readonly MATRIX_WORLD_OFFSET = Uniforms.NUM_SHAPES_OFFSET + 4 * INT32_BYTES;
-    static readonly MATRIX_PROJECTION_OFFSET = Uniforms.MATRIX_WORLD_OFFSET + MATRIX4_BYTES;
-    static readonly AMBIENT_OFFSET = Uniforms.MATRIX_PROJECTION_OFFSET + MATRIX4_BYTES;
-    static readonly LIGHT_OFFSET = Uniforms.AMBIENT_OFFSET + VEC4_BYTES;
-    static readonly POSITION_LIGHT_OFFSET = Uniforms.LIGHT_OFFSET + VEC3_BYTES;
-
-    static readonly BYTES = Uniforms.POSITION_LIGHT_OFFSET + INT32_BYTES;
-
-    private shapeCount = 0;
-
-    private readonly buffer: Uint8Array = new Uint8Array(Uniforms.BYTES);
-    private readonly dataView: DataView = new DataView(this.buffer.buffer);
-    private readonly glBuffer: WebGLBuffer;
-    private readonly dirtyRange = [-1, -1];
-
-    constructor(readonly gl: WebGL2RenderingContext, readonly blockBinding = 0) {
+    protected constructor(readonly gl: WebGL2RenderingContext, readonly blockBinding: number, readonly buffer: Uint8Array) {
         const glBuffer = gl.createBuffer();
         if (!glBuffer)
             throw new Error("Error creating gl buffer");
         this.glBuffer = glBuffer;
         gl.bindBuffer(gl.UNIFORM_BUFFER, this.glBuffer);
-        gl.bufferData(gl.UNIFORM_BUFFER, Uniforms.BYTES, gl.DYNAMIC_DRAW);
+        gl.bufferData(gl.UNIFORM_BUFFER, buffer.length, gl.DYNAMIC_DRAW);
         gl.bindBuffer(gl.UNIFORM_BUFFER, null);
         gl.bindBufferBase(gl.UNIFORM_BUFFER, blockBinding, this.glBuffer);
+        this.dataView = new DataView(this.buffer.buffer)
     }
 
-    addShape(shape: Shape): number {
-        const index = this.shapeCount;
-        if (index == Uniforms.MAX_SHAPES)
-            return -1;
-
-        this.shapeCount++;
-        const shapeOffset = Uniforms.SHAPES_OFFSET + index * Shape.BYTES;
-        shape.write(this.dataView, shapeOffset);
-        this.setInt32(Uniforms.NUM_SHAPES_OFFSET, this.shapeCount);
-
-        this.updateDirtyRange(Uniforms.SHAPES_OFFSET, Uniforms.MAX_SHAPES * Shape.BYTES + INT32_BYTES);
-        return index;
-    }
-
-    setCamera(camera: PerspectiveCamera): void {
-        this.setMatrix4(Uniforms.MATRIX_WORLD_OFFSET, camera.invWorldMatrix);
-        this.setMatrix4(Uniforms.MATRIX_PROJECTION_OFFSET, camera.invProjectionMatrix);
-        this.updateDirtyRange(Uniforms.MATRIX_WORLD_OFFSET, 2 * MATRIX4_BYTES);
-    }
-
-    setAmbient(color: vec3): void {
-        this.setVector3(Uniforms.AMBIENT_OFFSET, color);
-    }
-
-    setLight(light: DirectionalLight | PointLight): void {
-        if (light.type === 'directional') {
-            this.setVector3(Uniforms.LIGHT_OFFSET, light.direction);
-            this.setInt32(Uniforms.POSITION_LIGHT_OFFSET, 0);
-        } else {
-            this.setVector3(Uniforms.LIGHT_OFFSET, light.position);
-            this.setInt32(Uniforms.POSITION_LIGHT_OFFSET, 1);
-        }
-        this.updateDirtyRange(Uniforms.LIGHT_OFFSET, VEC3_BYTES + INT32_BYTES);
-    }
-
-    updateGlBuffer(): boolean {
-        if (this.dirtyRange[0] !== this.dirtyRange[1]) {
-            const {gl, glBuffer, buffer} = this;
-            gl.bindBuffer(gl.UNIFORM_BUFFER, glBuffer);
-            gl.bufferSubData(gl.UNIFORM_BUFFER, this.dirtyRange[0], buffer, this.dirtyRange[0], this.dirtyRange[1] - this.dirtyRange[0]);
-            gl.bindBuffer(gl.UNIFORM_BUFFER, null);
-            this.dirtyRange[0] = this.dirtyRange[1] = -1;
-            return true;
-        }
-        return false;
-    }
-
-    private setFloat32(byteOffset: number, value: number): Uniforms {
+    protected setFloat32(byteOffset: number, value: number): this {
         this.dataView.setFloat32(byteOffset, value, true);
         return this;
     }
 
-    private setInt32(byteOffset: number, value: number): void {
+    protected setInt32(byteOffset: number, value: number): void {
         this.dataView.setInt32(byteOffset, value, true);
     }
 
-    private setVector3(byteOffset: number, value: vec3): void {
+    protected setVector3(byteOffset: number, value: vec3): void {
         this.setFloat32(byteOffset, value[0]).setFloat32(byteOffset + 4, value[1]).setFloat32(byteOffset + 8, value[2]);
     }
 
-    private setMatrix4(byteOffset: number, matrix: mat4): void {
+    protected setMatrix4(byteOffset: number, matrix: mat4): void {
         for (let i = 0; i < 16; i++) {
             this.setFloat32(byteOffset + i * 4, matrix[i]);
         }
     }
 
-    private updateDirtyRange(offset: number, bytes: number): void {
-        if (this.dirtyRange[0] < 0) this.dirtyRange[0] = offset;
-        else this.dirtyRange[0] = Math.min(offset, this.dirtyRange[0]);
-        if (this.dirtyRange[1] < 0) this.dirtyRange[1] = offset + bytes;
-        else this.dirtyRange[1] = Math.max(offset + bytes, this.dirtyRange[1]);
+    protected updateGlBuffer(): void {
+        const {gl, glBuffer, buffer} = this;
+        gl.bindBuffer(gl.UNIFORM_BUFFER, glBuffer);
+        gl.bufferSubData(gl.UNIFORM_BUFFER, 0, buffer);
+        gl.bindBuffer(gl.UNIFORM_BUFFER, null);
+    }
+
+}
+
+export class CameraUniforms extends UniformBlock {
+
+    static readonly MATRIX_WORLD_OFFSET = 0;
+    static readonly MATRIX_PROJECTION_OFFSET = CameraUniforms.MATRIX_WORLD_OFFSET + MATRIX4_BYTES;
+    static readonly BYTES = 2 * MATRIX4_BYTES;
+
+    constructor(readonly gl: WebGL2RenderingContext) {
+        super(gl, 0, new Uint8Array(CameraUniforms.BYTES));
+    }
+
+    update(camera: PerspectiveCamera): void {
+        this.setMatrix4(CameraUniforms.MATRIX_WORLD_OFFSET, camera.invWorldMatrix);
+        this.setMatrix4(CameraUniforms.MATRIX_PROJECTION_OFFSET, camera.invProjectionMatrix);
+        this.updateGlBuffer();
+    }
+}
+
+export class ShapeUniforms extends UniformBlock {
+    static readonly MAX_SHAPES = 10;
+
+    static readonly SHAPES_OFFSET = 0;
+    static readonly NUM_SHAPES_OFFSET = ShapeUniforms.SHAPES_OFFSET + Shape.BYTES * ShapeUniforms.MAX_SHAPES;
+
+    static readonly BYTES = ShapeUniforms.NUM_SHAPES_OFFSET + INT_BYTES;
+
+    constructor(readonly gl: WebGL2RenderingContext) {
+        super(gl, 1, new Uint8Array(ShapeUniforms.BYTES));
+    }
+
+    update(shapes: Shape[]): void {
+        const shapeCount = Math.min(ShapeUniforms.MAX_SHAPES, shapes.length);
+        for (let i = 0; i < shapeCount; i++) {
+            const shape = shapes[i];
+            shape.write(this.dataView, i * Shape.BYTES);
+        }
+        this.setInt32(ShapeUniforms.NUM_SHAPES_OFFSET, shapeCount);
+        this.updateGlBuffer();
+    }
+}
+
+export class LightsUniforms extends UniformBlock {
+    static readonly AMBIENT_OFFSET = 0;
+    static readonly LIGHT_OFFSET = LightsUniforms.AMBIENT_OFFSET + VEC4_BYTES;
+    static readonly POSITION_LIGHT_OFFSET = LightsUniforms.LIGHT_OFFSET + VEC3_BYTES;
+
+    static readonly BYTES = 2 * VEC4_BYTES;
+
+    constructor(readonly gl: WebGL2RenderingContext) {
+        super(gl, 2, new Uint8Array(LightsUniforms.BYTES));
+    }
+
+    setAmbient(color: vec3): void {
+        this.setVector3(LightsUniforms.AMBIENT_OFFSET, color);
+        this.updateGlBuffer();
+    }
+
+    setLight(light: DirectionalLight | PointLight): void {
+        if (light.type === 'directional') {
+            this.setVector3(LightsUniforms.LIGHT_OFFSET, light.direction);
+            this.setInt32(LightsUniforms.POSITION_LIGHT_OFFSET, 0);
+        } else {
+            this.setVector3(LightsUniforms.LIGHT_OFFSET, light.position);
+            this.setInt32(LightsUniforms.POSITION_LIGHT_OFFSET, 1);
+        }
+        this.updateGlBuffer();
     }
 
 }

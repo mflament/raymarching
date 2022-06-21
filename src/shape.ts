@@ -22,6 +22,7 @@ const VEC3_BYTES = 3 * 4;
  * };
  */
 export class Shape {
+
     static readonly POSITION_OFFSET = 0;
     static readonly SIZE_OFFSET = Shape.POSITION_OFFSET + VEC4_BYTES;
     static readonly COLOR_OFFSET = Shape.SIZE_OFFSET + VEC4_BYTES;

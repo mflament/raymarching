@@ -55,6 +55,10 @@ const MyMath = {
             out[1] = r * Math.cos(i);
             out[2] = r * Math.cos(a) * Math.sin(i);
             return out;
+        },
+        abs(out: vec3, v: vec3): vec3 {
+            vec3.set(out, Math.abs(v[0]), Math.abs(v[1]), Math.abs(v[2]));
+            return out;
         }
     },
     quat: {

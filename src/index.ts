@@ -1,13 +1,20 @@
 import {Shaders} from "./shaders";
-import {Uniforms} from "./uniforms";
 import {FPSOverlay, GLContext, QuadRenderer, RunningState} from "webgl-support";
 import {PerspectiveCamera} from "./PerspectiveCamera";
 import {DirectionalLight, PointLight} from "./Light";
-import {quat, vec3} from "gl-matrix";
+import {quat, vec2, vec3} from "gl-matrix";
 import {Shape, ShapeType} from "./shape";
 import {OrbitControls} from "./orbitControls";
+import {CameraUniforms, LightsUniforms, ShapeUniforms} from "./uniforms";
+import {Ray} from "./ray";
+import {rayMarcher} from "./rayMarcher";
 
 const pointLight = false;
+
+const MAX_DST = 80;
+const EPSILON = 0.001;
+const SHADOW_BIAS = EPSILON * 50;
+
 
 /**
  * https://github.com/SebLague/Ray-Marching/
@@ -24,10 +31,12 @@ function start() {
         aspect: canvas.width / canvas.height
     });
 
-    const uniforms = new Uniforms(context.gl);
+    const cameraUniforms = new CameraUniforms(context.gl);
+    const shapesUniforms = new ShapeUniforms(context.gl);
+    const lightsUniforms = new LightsUniforms(context.gl);
 
     const amb = .08;
-    uniforms.setAmbient([amb, amb, amb]);
+    lightsUniforms.setAmbient([amb, amb, amb]);
 
     let light: DirectionalLight | PointLight;
     if (pointLight) {
@@ -37,66 +46,91 @@ function start() {
         vec3.normalize(direction, direction);
         light = {type: 'directional', direction: direction};
     }
-    uniforms.setLight(light);
+    lightsUniforms.setLight(light);
 
     const program = context.programBuilder().vertexShader(Shaders.vs).fragmentShader(Shaders.fs).link();
-    const uboIndex = gl.getUniformBlockIndex(program, "Uniforms");
-    gl.uniformBlockBinding(program, uboIndex, 0);
+    const quadRenderer = new QuadRenderer(context, program);
 
-    uniforms.addShape(new Shape({
+    const uf = context.programUniformsFactory(program);
+    const uMaxDst = uf('uMaxDst', 'float');
+    uMaxDst.value = MAX_DST;
+
+    const uEpsilon = uf('uEpsilon', 'float');
+    uEpsilon.value = EPSILON;
+
+    const uShadowBias = uf('uShadowBias', 'float');
+    uShadowBias.value = SHADOW_BIAS;
+
+    let uboIndex = gl.getUniformBlockIndex(program, "uCamera");
+    gl.uniformBlockBinding(program, uboIndex, cameraUniforms.blockBinding);
+    uboIndex = gl.getUniformBlockIndex(program, "uShapes");
+    gl.uniformBlockBinding(program, uboIndex, shapesUniforms.blockBinding);
+    uboIndex = gl.getUniformBlockIndex(program, "uLights");
+    gl.uniformBlockBinding(program, uboIndex, lightsUniforms.blockBinding);
+
+    const shapes = [new Shape({
         position: [0, 0, 0],
-        size: [1, 1, 1],
+        size: [.5, .5, .5],
         color: [0, 1, 0],
         shapeType: ShapeType.Cube,
-    }));
-
-    uniforms.addShape(new Shape({
+    }), new Shape({
         position: [.5, 0, -1.5],
-        size: [1, 1, 1],
+        size: [.5, .5, .5],
         color: [1, 0, 0],
         shapeType: ShapeType.Cube,
-    }));
-
-    uniforms.addShape(new Shape({
+    }), new Shape({
         position: [-.5, 0, -3],
-        size: [1, 1, 1],
+        size: [.5, .5, .5],
         color: [0, 0, 1],
         shapeType: ShapeType.Cube,
-    }));
-
-    uniforms.addShape(new Shape({
+    }), new Shape({
         position: [-1, 0, -1.5],
-        size: [.5, 1, 1],
+        size: [.5, 0, 0],
         color: [1, 0, 1],
         shapeType: ShapeType.Sphere,
-    }));
+    })];
 
-    // uniforms.addShape(new Shape({color: [0,0,1], size: [1,1,1], position: [0, 1, 1], shapeType: ShapeType.Sphere}));
+    shapesUniforms.update(shapes);
 
-    const quadRenderer = new QuadRenderer(context, program);
     const controls = new OrbitControls(camera, canvas);
     let updateCam = true;
     controls.onChange = () => updateCam = true;
+
+    const rc = camera.rayCaster();
+    const rm = rayMarcher(shapes, MAX_DST, EPSILON);
+    const ray: Ray = {origin: vec3.create(), dir: vec3.create()};
+    const uv = vec2.create();
+    canvas.addEventListener('mousedown', e => {
+        if (e.button === 0) {
+            vec2.set(uv, e.clientX / canvas.width * 2 - 1,  (1 - e.clientY / canvas.height) * 2 - 1);
+            const intersect = rm(rc(ray, uv));
+            if (intersect)
+                console.log('shape index ', shapes.indexOf(intersect.shape), 'pos', [...intersect.pointOnSurface]);
+        }
+    });
+
     const lightTransform = quat.create();
+    const rotateLight = (rs: RunningState) => {
+        const angle = rs.dt * 0.1 * Math.PI;
+        if (light.type === 'directional') {
+            quat.rotateY(lightTransform, quat.identity(lightTransform), angle);
+            vec3.transformQuat(light.direction, light.direction, lightTransform);
+            lightsUniforms.setLight(light);
+        } else {
+            vec3.rotateY(light.position, light.position, [0, light.position[1], 0], angle);
+            lightsUniforms.setLight(light);
+        }
+    };
+
     context.renderer = {
         program: program,
         render(rs: RunningState) {
             if (updateCam) {
-                uniforms.setCamera(camera);
+                cameraUniforms.update(camera);
                 updateCam = false;
             }
-            const angle = rs.dt * 0.1 * Math.PI;
-            if (light.type === 'directional') {
-                quat.rotateY(lightTransform, quat.identity(lightTransform), angle);
-                vec3.transformQuat(light.direction, light.direction, lightTransform);
-                uniforms.setLight(light);
-            } else {
-                vec3.rotateY(light.position, light.position, [0, light.position[1], 0], angle);
-                uniforms.setLight(light);
-            }
-            if (uniforms.updateGlBuffer()) {
-                quadRenderer.render(rs);
-            }
+            rotateLight(rs);
+            quadRenderer.render(rs);
         },
         resized: (width, height) => {
             camera.aspect = width / height;
