@@ -26,7 +26,7 @@ const RAY_MARCHER_FS = `
         vec3 position;
         mat3 rotation;
         vec4 size;
-        vec3 color;
+        vec4 color;
         float blendStrength;
         int shapeType;
         int operation;
@@ -52,6 +52,8 @@ const RAY_MARCHER_FS = `
         vec3 light;
         int positionLight;
     };
+
+    uniform int uSelectedShape;
 
     in vec2 uv;
     out vec4 color;
@@ -168,6 +170,13 @@ const RAY_MARCHER_FS = `
         }
         return vec4(color, dst);
     }
+    
+    vec3 shapeColor(in int index) {
+        vec3 col = shapes[index].color.rgb;
+        if (index == uSelectedShape)
+            col *= 2.;
+        return col;
+    }
 
     vec4 createSceneInfo(vec3 eye) {
         float globalDst = uMaxDst;
@@ -178,13 +187,13 @@ const RAY_MARCHER_FS = `
             int numChildren = shape.numChildren;
 
             float localDst = getShapeDistance(shape, eye);
-            vec3 localColor = shape.color.rgb;
-
+            vec3 localColor = shapeColor(i);
+            
             for (int j = 0; j < numChildren; j ++) {
                 Shape childShape = shapes[i+j+1];
                 float childDst = getShapeDistance(childShape, eye);
 
-                vec4 combined = combine(localDst, childDst, localColor, childShape.color, childShape.operation, childShape.blendStrength);
+                vec4 combined = combine(localDst, childDst, localColor, shapeColor(i+j+1), childShape.operation, childShape.blendStrength);
                 localColor = combined.xyz;
                 localDst = combined.w;
             }

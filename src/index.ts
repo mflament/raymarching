@@ -1,9 +1,9 @@
 import {Shaders} from "./shaders";
-import {FPSOverlay, GLContext, QuadRenderer, RunningState} from "webgl-support";
+import {dumpUniforms, FPSOverlay, GLContext, QuadRenderer, RunningState} from "webgl-support";
 import {PerspectiveCamera} from "./PerspectiveCamera";
 import {DirectionalLight, PointLight} from "./Light";
 import {mat3, quat, vec2, vec3} from "gl-matrix";
-import {Shape, ShapeType} from "./shape";
+import {Operation, Shape, ShapeType} from "./shape";
 import {OrbitControls} from "./orbitControls";
 import {CameraUniforms, LightsUniforms, ShapeUniforms} from "./uniforms";
 import {Ray} from "./ray";
@@ -50,7 +50,7 @@ function start() {
 
     const program = context.programBuilder().vertexShader(Shaders.vs).fragmentShader(Shaders.fs).link();
     const quadRenderer = new QuadRenderer(context, program);
-    // console.log(dumpUniforms(gl, program));
+    console.log(dumpUniforms(gl, program));
 
     const uf = context.programUniformsFactory(program);
     const uMaxDst = uf('uMaxDst', 'float');
@@ -62,6 +62,9 @@ function start() {
     const uShadowBias = uf('uShadowBias', 'float');
     uShadowBias.value = SHADOW_BIAS;
 
+    const uSelectedShape = uf('uSelectedShape', 'int');
+    uSelectedShape.value = -1;
+
     let uboIndex = gl.getUniformBlockIndex(program, "uCamera");
     gl.uniformBlockBinding(program, uboIndex, cameraUniforms.blockBinding);
     uboIndex = gl.getUniformBlockIndex(program, "uShapes");
@@ -72,23 +75,30 @@ function start() {
     const shapes = [new Shape({
         position: [0, 0, 0],
         size: [.5, .5, .5, .0],
-        color: [0, 1, 0],
+        color: [0, 1, 0, 0.],
         shapeType: ShapeType.Box,
+        operation: Operation.None,
     }), new Shape({
-        position: [.5, 0, -1.5],
+        position: [.25, 0, -1.0],
         size: [.5, .5, .5, 0.1],
-        color: [1, 1, 0],
+        color: [1, 1, 0, 0.],
         shapeType: ShapeType.RBox,
+        operation: Operation.Blend,
+        blendStrength: .2,
     }), new Shape({
-        position: [-.5, 0, -3],
+        position: [-0.75, 0, -1.5],
         size: [.5, .0, .0, .0],
-        color: [0, 0, 1],
+        color: [0, 0, 1, 0.],
         shapeType: ShapeType.Sphere,
+        operation: Operation.Blend,
+        blendStrength: .3,
     }), new Shape({
-        position: [-1, 0, -1.5],
+        position: [-.5, 0, -2.5],
         size: [.5, .15, .0, .0],
-        color: [1, 0, 1],
+        color: [1, 0, 1, 0.],
         shapeType: ShapeType.Torus,
+        operation: Operation.Blend,
+        blendStrength: .2,
     })];
 
     shapesUniforms.update(shapes);
@@ -105,10 +115,15 @@ function start() {
         if (e.button === 0) {
             vec2.set(uv, e.clientX / canvas.width * 2 - 1, (1 - e.clientY / canvas.height) * 2 - 1);
             const intersect = rm(rc(ray, uv));
-            if (intersect)
+            if (intersect) {
                 console.log('shape index ', shapes.indexOf(intersect.shape), 'pos', [...intersect.pointOnSurface]);
+                uSelectedShape.value = shapes.indexOf(intersect.shape);
+            } else {
+                uSelectedShape.value = -1;
+            }
         }
     });
+    canvas.addEventListener('mouseup', () => uSelectedShape.value = -1);
 
     const lightTransform = quat.create();
     let rotateLight: (rs: RunningState) => void;

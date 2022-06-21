@@ -8,7 +8,6 @@ const INT32_BYTES = 4;
 const FLOAT32_BYTES = 4;
 const MAT3_BYTES = 3 * 4 * 4;
 const VEC4_BYTES = 4 * 4;
-const VEC3_BYTES = 3 * 4;
 
 /**
  * struct Shape {
@@ -28,17 +27,17 @@ export class Shape {
     static readonly ROTATION_OFFSET = Shape.POSITION_OFFSET + VEC4_BYTES;
     static readonly SIZE_OFFSET = Shape.ROTATION_OFFSET + MAT3_BYTES;
     static readonly COLOR_OFFSET = Shape.SIZE_OFFSET + VEC4_BYTES;
-    static readonly BLEND_STRENGTH_OFFSET = Shape.COLOR_OFFSET + VEC3_BYTES;
+    static readonly BLEND_STRENGTH_OFFSET = Shape.COLOR_OFFSET + VEC4_BYTES;
     static readonly SHAPE_TYPE_OFFSET = Shape.BLEND_STRENGTH_OFFSET + FLOAT32_BYTES;
     static readonly OPERATION_OFFSET = Shape.SHAPE_TYPE_OFFSET + INT32_BYTES;
     static readonly NUM_CHILDREN_OFFSET = Shape.OPERATION_OFFSET + INT32_BYTES;
 
-    static readonly BYTES = Shape.NUM_CHILDREN_OFFSET + INT32_BYTES + 4;
+    static readonly BYTES = Shape.NUM_CHILDREN_OFFSET + INT32_BYTES;
 
     readonly position = vec3.create();
     readonly rotation = mat3.create();
     readonly size = vec4.create();
-    readonly color = vec3.create();
+    readonly color = vec4.create();
 
     blendStrength = 0;
     shapeType: ShapeType = ShapeType.Box;
@@ -50,7 +49,7 @@ export class Shape {
         if (param?.rotation) mat3.copy(this.rotation, param.rotation);
         else mat3.transpose(this.rotation, mat3.identity(this.rotation));
         if (param?.size) vec4.copy(this.size, param.size);
-        if (param?.color) vec3.copy(this.color, param.color);
+        if (param?.color) vec4.copy(this.color, param.color);
         if (param?.blendStrength !== undefined) this.blendStrength = param.blendStrength;
         if (param?.shapeType !== undefined) this.shapeType = param.shapeType;
         if (param?.operation !== undefined) this.operation = param.operation;
@@ -61,7 +60,7 @@ export class Shape {
         writeVec3(dv, byteOffset + Shape.POSITION_OFFSET, this.position, 1, littleEndian);
         writeMat3(dv, byteOffset + Shape.ROTATION_OFFSET, mat3.transpose(this.rotation, this.rotation), littleEndian);
         writeVec4(dv, byteOffset + Shape.SIZE_OFFSET, this.size, littleEndian);
-        writeVec3(dv, byteOffset + Shape.COLOR_OFFSET, this.color, 0, littleEndian);
+        writeVec4(dv, byteOffset + Shape.COLOR_OFFSET, this.color, littleEndian);
         dv.setFloat32(byteOffset + Shape.BLEND_STRENGTH_OFFSET, this.blendStrength, littleEndian);
         dv.setInt32(byteOffset + Shape.SHAPE_TYPE_OFFSET, this.shapeType, littleEndian);
         dv.setInt32(byteOffset + Shape.OPERATION_OFFSET, this.operation, littleEndian);
