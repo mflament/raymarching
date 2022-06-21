@@ -1,3 +1,5 @@
+// https://iquilezles.org/www/articles/distfunctions (living god)
+
 // language=glsl
 const RAY_MARCHER_VS = `
     #version 300 es
@@ -22,7 +24,8 @@ const RAY_MARCHER_FS = `
 
     struct Shape {
         vec3 position;
-        vec3 size;
+        mat3 rotation;
+        vec4 size;
         vec3 color;
         float blendStrength;
         int shapeType;
@@ -54,8 +57,9 @@ const RAY_MARCHER_FS = `
     out vec4 color;
 
     #define SPHERE 0
-    #define CUBE   1
+    #define BOX    1
     #define TORUS  2
+    #define RBOX   3
 
     #define NONE   0
     #define BLEND  1
@@ -78,37 +82,43 @@ const RAY_MARCHER_FS = `
         return ray;
     }
 
-    // Following distance functions from https://iquilezles.org/www/articles/distfunctions/distfunctions.htm
-    float dot2(in vec2 v) { return dot(v, v); }
-    float dot2(in vec3 v) { return dot(v, v); }
-    float ndot(in vec2 a, in vec2 b) { return a.x*b.x - a.y*b.y; }
-
-    float getSphereDistance(vec3 eye, vec3 centre, float radius) {
-        return distance(eye, centre) - radius;
-    }
-
-    float getCubeDistance(vec3 eye, vec3 centre, vec3 size) {
-        vec3 o = abs(eye - centre) - size;
-        float ud = length(max(o, 0.));
-        float n = max(max(min(o.x, 0.), min(o.y, 0.)), min(o.z, 0.));
-        return ud + n;
-    }
-
-    float getTorusDistance(vec3 eye, vec3 centre, float r1, float r2)
+    float sdSphere(vec3 p, float radius)
     {
-        vec2 q = vec2(length((eye - centre).xz) - r1, eye.y - centre.y);
-        return length(q) - r2;
+        return length(p) - radius;
     }
 
-    float getShapeDistance(Shape shape, vec3 eye) {
+    float sdBox(vec3 p, vec3 b)
+    {
+        vec3 q = abs(p) - b;
+        return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+    }
+
+    float sdRoundBox(vec3 p, vec3 b, float r)
+    {
+        vec3 q = abs(p) - b;
+        return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0) - r;
+    }
+
+    float sdTorus(vec3 p, vec2 t)
+    {
+        vec2 q = vec2(length(p.xz)-t.x, p.y);
+        return length(q)-t.y;
+    }
+
+    float getShapeDistance(Shape shape, vec3 eye)
+    {
+        //mat3 rotation = mat3(1.,0.,0., 0., 1., 0., 0., 0., 1.);
+        vec3 p = (shape.position - eye) * shape.rotation;
         switch (shape.shapeType)
         {
             case SPHERE:
-            return getSphereDistance(eye, shape.position, shape.size.x);
-            case CUBE:
-            return getCubeDistance(eye, shape.position, shape.size);
+            return sdSphere(p, shape.size.x);
+            case BOX:
+            return sdBox(p, shape.size.xyz);
+            case RBOX:
+            return sdRoundBox(p, shape.size.xyz, shape.size.w);
             case TORUS:
-            return getTorusDistance(eye, shape.position, shape.size.x, shape.size.y);
+            return sdTorus(p, shape.size.xy);
             default :
             return uMaxDst;
         }

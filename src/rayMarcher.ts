@@ -40,7 +40,7 @@ export function rayMarcher(shapes: Shape[], maxDst: number, epsilon: number): (r
         switch (shape.shapeType) {
             case ShapeType.Sphere:
                 return sphereDistance(from, shape);
-            case ShapeType.Cube:
+            case ShapeType.Box:
                 return cubeDistance(from, shape);
             case ShapeType.Torus:
                 return torusDistance(from, shape);

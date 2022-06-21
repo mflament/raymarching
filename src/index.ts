@@ -2,7 +2,7 @@ import {Shaders} from "./shaders";
 import {FPSOverlay, GLContext, QuadRenderer, RunningState} from "webgl-support";
 import {PerspectiveCamera} from "./PerspectiveCamera";
 import {DirectionalLight, PointLight} from "./Light";
-import {quat, vec2, vec3} from "gl-matrix";
+import {mat3, quat, vec2, vec3} from "gl-matrix";
 import {Shape, ShapeType} from "./shape";
 import {OrbitControls} from "./orbitControls";
 import {CameraUniforms, LightsUniforms, ShapeUniforms} from "./uniforms";
@@ -50,6 +50,7 @@ function start() {
 
     const program = context.programBuilder().vertexShader(Shaders.vs).fragmentShader(Shaders.fs).link();
     const quadRenderer = new QuadRenderer(context, program);
+    // console.log(dumpUniforms(gl, program));
 
     const uf = context.programUniformsFactory(program);
     const uMaxDst = uf('uMaxDst', 'float');
@@ -70,24 +71,24 @@ function start() {
 
     const shapes = [new Shape({
         position: [0, 0, 0],
-        size: [.5, .5, .5],
+        size: [.5, .5, .5, .0],
         color: [0, 1, 0],
-        shapeType: ShapeType.Cube,
+        shapeType: ShapeType.Box,
     }), new Shape({
         position: [.5, 0, -1.5],
-        size: [.5, .5, .5],
-        color: [1, 0, 0],
-        shapeType: ShapeType.Cube,
+        size: [.5, .5, .5, 0.1],
+        color: [1, 1, 0],
+        shapeType: ShapeType.RBox,
     }), new Shape({
         position: [-.5, 0, -3],
-        size: [.5, .5, .5],
+        size: [.5, .0, .0, .0],
         color: [0, 0, 1],
-        shapeType: ShapeType.Cube,
+        shapeType: ShapeType.Sphere,
     }), new Shape({
         position: [-1, 0, -1.5],
-        size: [.5, 0, 0],
+        size: [.5, .15, .0, .0],
         color: [1, 0, 1],
-        shapeType: ShapeType.Sphere,
+        shapeType: ShapeType.Torus,
     })];
 
     shapesUniforms.update(shapes);
@@ -102,7 +103,7 @@ function start() {
     const uv = vec2.create();
     canvas.addEventListener('mousedown', e => {
         if (e.button === 0) {
-            vec2.set(uv, e.clientX / canvas.width * 2 - 1,  (1 - e.clientY / canvas.height) * 2 - 1);
+            vec2.set(uv, e.clientX / canvas.width * 2 - 1, (1 - e.clientY / canvas.height) * 2 - 1);
             const intersect = rm(rc(ray, uv));
             if (intersect)
                 console.log('shape index ', shapes.indexOf(intersect.shape), 'pos', [...intersect.pointOnSurface]);
@@ -110,16 +111,37 @@ function start() {
     });
 
     const lightTransform = quat.create();
-    const rotateLight = (rs: RunningState) => {
-        const angle = rs.dt * 0.1 * Math.PI;
-        if (light.type === 'directional') {
+    let rotateLight: (rs: RunningState) => void;
+    if (light.type === 'directional') {
+        const dlight = light;
+        rotateLight = rs => {
+            const angle = rs.dt * 0.1 * Math.PI;
             quat.rotateY(lightTransform, quat.identity(lightTransform), angle);
-            vec3.transformQuat(light.direction, light.direction, lightTransform);
-            lightsUniforms.setLight(light);
-        } else {
-            vec3.rotateY(light.position, light.position, [0, light.position[1], 0], angle);
+            vec3.transformQuat(dlight.direction, dlight.direction, lightTransform);
             lightsUniforms.setLight(light);
         }
+    } else {
+        const plight = light;
+        rotateLight = rs => {
+            const angle = rs.dt * 0.1 * Math.PI;
+            vec3.rotateY(plight.position, plight.position, [0, plight.position[1], 0], angle);
+            lightsUniforms.setLight(light);
+        };
+    }
+
+    const q = quat.create();
+    const shapesAA = shapes.map(() => {
+        const axis = vec3.create();
+        vec3.normalize(axis, vec3.set(axis, Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1));
+        return {axis: axis, angle: 0}
+    });
+    const rotateShapes = (rs: RunningState) => {
+        shapes.forEach((shape, i) => {
+            shapesAA[i].angle += rs.dt * Math.PI * .5;
+            quat.setAxisAngle(q, shapesAA[i].axis, shapesAA[i].angle);
+            mat3.fromQuat(shape.rotation, q);
+        });
+        shapesUniforms.update(shapes);
     };
 
     context.renderer = {
@@ -130,6 +152,7 @@ function start() {
                 updateCam = false;
             }
             rotateLight(rs);
+            rotateShapes(rs);
             quadRenderer.render(rs);
         },
         resized: (width, height) => {

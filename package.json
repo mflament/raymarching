@@ -43,6 +43,6 @@
   },
   "dependencies": {
     "gl-matrix": "^3.4.3",
-    "webgl-support": "^1.0.0"
+    "webgl-support": "^1.1.0"
   }
 }
